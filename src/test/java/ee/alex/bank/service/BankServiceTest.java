@@ -5,12 +5,14 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
+import ee.alex.bank.exception.AccountErrorException;
 import ee.alex.bank.model.Account;
 import ee.alex.bank.model.CheckingAccount;
 import ee.alex.bank.model.SavingsAccount;
 import static ee.alex.bank.model.AccountType.CHECKING;
 import static ee.alex.bank.model.AccountType.SAVINGS;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -217,6 +219,43 @@ public class BankServiceTest {
     // then
     verifyStatic(SavingsAccount.class);
     SavingsAccount.setInterestRate(0.3);
+  }
+
+  @Test
+  public void findAccount_ReturnsAccount_IfAccountFound() throws Exception {
+    // given
+    BankService bankService = new BankService();
+    bankService.createSavingsAccount("Peter Parker");
+    bankService.createSavingsAccount("Rick Grimes");
+    UUID savingsAccountId = bankService.createSavingsAccount("Nick Burns");
+    bankService.createCheckingAccount("Mark Watson", 500.0);
+
+    // when
+    Account result = bankService.findAccount(savingsAccountId);
+
+    // then
+    assertThat(result).isInstanceOfSatisfying(SavingsAccount.class, it -> {
+      assertThat(it.getAccountId()).isEqualTo(savingsAccountId);
+      assertThat(it.getOwner()).isEqualTo("Nick Burns");
+      assertThat(it.getBalance()).isEqualTo(0.0);
+      assertThat(it.getType()).isEqualTo(SAVINGS);
+    });
+  }
+
+  @Test
+  public void findAccount_ThrowsAccountErrorException_IfAccountNotFound() {
+    // given
+    BankService bankService = new BankService();
+    bankService.createSavingsAccount("Peter Parker");
+    bankService.createSavingsAccount("Rick Grimes");
+    bankService.createSavingsAccount("Nick Burns");
+    bankService.createCheckingAccount("Mark Watson", 500.0);
+
+    // when
+    Throwable result = catchThrowable(() -> bankService.findAccount(UUID.fromString("52769427-20e4-443a-b7f3-c0989db1b4ea")));
+
+    // then
+    assertThat(result).isInstanceOf(AccountErrorException.class).hasMessage("Invalid account number");
   }
 
 }
